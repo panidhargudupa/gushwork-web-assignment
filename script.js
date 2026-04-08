@@ -337,13 +337,17 @@ function initFaqAccordion() {
 
   items.forEach((it) => {
     const panel = it.querySelector(".faq-item__a");
+    const btn = it.querySelector(".faq-item__btn");
     if (!panel) return;
+    const isOpen = btn?.getAttribute("aria-expanded") === "true";
+    it.classList.toggle("is-open", Boolean(isOpen));
     panel.style.overflow = "hidden";
     panel.style.height = panel.hasAttribute("hidden") ? "0px" : "auto";
     panel.style.opacity = panel.hasAttribute("hidden") ? "0" : "1";
+    panel.style.transform = panel.hasAttribute("hidden") ? "translateY(-6px)" : "translateY(0)";
     panel.style.transition = reduceMotion
       ? "none"
-      : "height 300ms cubic-bezier(0.22, 1, 0.36, 1), opacity 220ms ease";
+      : "height 360ms cubic-bezier(0.22, 1, 0.36, 1), opacity 260ms ease, transform 360ms cubic-bezier(0.22, 1, 0.36, 1)";
   });
 
   function setFaqOpen(item, open) {
@@ -353,23 +357,27 @@ function initFaqAccordion() {
     if (btn.getAttribute("aria-expanded") === String(open)) return;
 
     btn.setAttribute("aria-expanded", String(open));
+    item.classList.toggle("is-open", open);
 
     if (open) {
       panel.removeAttribute("hidden");
       if (reduceMotion) {
         panel.style.height = "auto";
         panel.style.opacity = "1";
+        panel.style.transform = "translateY(0)";
         return;
       }
 
       panel.style.height = "0px";
       panel.style.opacity = "0";
+      panel.style.transform = "translateY(-6px)";
       void panel.offsetHeight;
 
       const targetHeight = `${panel.scrollHeight}px`;
       requestAnimationFrame(() => {
         panel.style.height = targetHeight;
         panel.style.opacity = "1";
+        panel.style.transform = "translateY(0)";
       });
 
       panel.addEventListener(
@@ -387,6 +395,7 @@ function initFaqAccordion() {
       if (reduceMotion) {
         panel.style.height = "0px";
         panel.style.opacity = "0";
+        panel.style.transform = "translateY(-6px)";
         panel.setAttribute("hidden", "");
         return;
       }
@@ -394,11 +403,13 @@ function initFaqAccordion() {
       const startHeight = `${panel.scrollHeight}px`;
       panel.style.height = startHeight;
       panel.style.opacity = "1";
+      panel.style.transform = "translateY(0)";
       void panel.offsetHeight;
 
       requestAnimationFrame(() => {
         panel.style.height = "0px";
         panel.style.opacity = "0";
+        panel.style.transform = "translateY(-6px)";
       });
 
       panel.addEventListener(
@@ -692,29 +703,55 @@ function initModalBehavior() {
     }
   });
 
-  const quoteForm = document.getElementById("quoteForm");
-  if (quoteForm) {
-    quoteForm.addEventListener("submit", (event) => {
-      event.preventDefault();
-      closeModal("quoteModal");
-    });
+  bindModalSuccessForm("quoteForm", "quoteModal", "Thank you for submission.");
+  bindModalSuccessForm("datasheetForm", "datasheetModal", "Thank you for submission.");
+  bindModalSuccessForm("downloadPdfForm", "downloadPdfModal", "Thank you for submission.");
+  bindInlineSuccessForm(".cta__form", "Thank you for submission.");
+}
+
+function bindModalSuccessForm(formId, modalId, successMessage) {
+  const form = document.getElementById(formId);
+
+  if (!form) return;
+
+  form.addEventListener("submit", (event) => {
+    event.preventDefault();
+    closeModal(modalId);
+    form.reset();
+    showAppNotification(successMessage);
+  });
+}
+
+function bindInlineSuccessForm(formSelector, successMessage) {
+  const form = document.querySelector(formSelector);
+
+  if (!form) return;
+
+  form.addEventListener("submit", (event) => {
+    event.preventDefault();
+    form.reset();
+    showAppNotification(successMessage);
+  });
+}
+
+let appNotificationTimeoutId = null;
+
+function showAppNotification(message) {
+  const notification = document.getElementById("appNotification");
+  const notificationText = document.getElementById("appNotificationText");
+
+  if (!notification || !notificationText) return;
+
+  notificationText.textContent = message;
+  notification.classList.add("is-visible");
+
+  if (appNotificationTimeoutId) {
+    window.clearTimeout(appNotificationTimeoutId);
   }
 
-  const datasheetForm = document.getElementById("datasheetForm");
-  if (datasheetForm) {
-    datasheetForm.addEventListener("submit", (event) => {
-      event.preventDefault();
-      closeModal("datasheetModal");
-    });
-  }
-
-  const downloadPdfForm = document.getElementById("downloadPdfForm");
-  if (downloadPdfForm) {
-    downloadPdfForm.addEventListener("submit", (event) => {
-      event.preventDefault();
-      closeModal("downloadPdfModal");
-    });
-  }
+  appNotificationTimeoutId = window.setTimeout(() => {
+    notification.classList.remove("is-visible");
+  }, 2600);
 }
 
 function openDownloadPdfModal({ title, description, key }) {
@@ -737,6 +774,16 @@ function handleStickyPriceBar() {
   if (!specsSection || !stickyBar) return;
 
   const check = () => {
+    const isMobileViewport = window.innerWidth <= 800;
+
+    if (isMobileViewport) {
+      stickyBar.classList.remove("visible");
+      if (header) {
+        header.classList.remove("price-bar-active");
+      }
+      return;
+    }
+
     const rect = specsSection.getBoundingClientRect();
     const showPriceBar = rect.top <= 0;
 
